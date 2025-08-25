@@ -1,6 +1,6 @@
 import streamlit as st
 from langgraph_backend import chatbot, retreive_all_threads
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 import uuid
 
 
@@ -30,6 +30,7 @@ def load_conversations(thread_id):
 if 'message_history' not in st.session_state:
     st.session_state['message_history'] = []
     
+
 if 'thread_id' not in st.session_state:
     st.session_state['thread_id'] = create_thread()
 
@@ -66,7 +67,10 @@ for thread_ids in st.session_state['thread_list']:
 
 #******************************************MAIN_UI*******************************************************
 
-CONFIG = {'configurable': {'thread_id': st.session_state['thread_id']}}
+CONFIG = {'configurable': {'thread_id': st.session_state['thread_id']},
+          "metadata": {'thread_id': st.session_state['thread_id']},
+          "run_name":"chat_turn"}
+
 
 
 for message in st.session_state['message_history']:
@@ -86,13 +90,16 @@ if user_input:
         st.text(user_input)
         
     with st.chat_message("AI"):
-        ai_message = st.write_stream(
-                message.content for message, metadata in chatbot.stream(
-                            {'messages': [HumanMessage(content=user_input)]},
+        
+        def ai_only_stream():
+            for message, metadata in chatbot.stream( {'messages': [HumanMessage(content=user_input)]},
                             config=(CONFIG),
-                            stream_mode = "messages"
-                )
-        )
+                            stream_mode = "messages"):
+                
+                if isinstance(message,AIMessage ):
+                    yield message.content
+                    
+        ai_message = st.write_stream(ai_only_stream())
  
     
     # first add the message to message_history
